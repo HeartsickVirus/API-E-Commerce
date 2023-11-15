@@ -1,0 +1,98 @@
+import requests
+from collections import defaultdict
+import openpyxl
+from openpyxl.styles import Alignment, Font
+
+
+base_url = 'http://localhost:3001' 
+endpoints = [
+    '/categoria', 
+    '/estados',
+    '/marcas',
+    '/productos',
+    '/roles', 
+    '/usuarios', 
+    '/ventas'
+   
+]
+cantidad_minima = 10  
+
+def get_data(endpoint):
+    url = f"{base_url}{endpoint}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Error al obtener datos de {endpoint}: {response.status_code}")
+        return None
+
+
+ventas_data = get_data('/ventas')
+
+
+response_ventas = requests.get(f"{base_url}/ventas")
+
+if response_ventas.status_code == 200:
+    ventas_data = response_ventas.json()
+
+    
+    response_productos = requests.get(f"{base_url}/productos")
+
+    if response_productos.status_code == 200:
+        productos_data = response_productos.json()
+        precios_productos = {int(producto['id_producto']): float(producto['precio']) for producto in productos_data}
+        total_ingreso = sum(precios_productos[venta['id_producto']] * venta['cantidad'] for venta in ventas_data if venta['id_producto'] in precios_productos)
+    else:
+        print(f"Error al obtener datos de productos: {response_productos.status_code}")
+else:
+    print(f"Error al obtener datos de ventas: {response_ventas.status_code}")
+
+
+ventas_por_categoria = defaultdict(int)
+
+for venta in ventas_data:
+    id_producto = venta['id_producto']
+    cantidad = venta['cantidad']
+    
+    for producto in productos_data:
+        if producto['id_producto'] == id_producto:
+            id_categoria = producto['id_categoria']
+            ventas_por_categoria[id_categoria] += cantidad
+
+
+categoria_mas_vendida_id = max(ventas_por_categoria, key=ventas_por_categoria.get)
+
+
+categoria_mas_vendida = get_data(f'/categoria/{categoria_mas_vendida_id}')
+
+
+precios_productos = {int(producto['id_producto']): float(producto['precio']) for producto in productos_data}
+
+
+usuarios_data = get_data('/usuarios')
+usuarios_nombres = {usuario['id_usuario']: f"{usuario['nombre_usuario']} {usuario['apellido_usuario']}" for usuario in usuarios_data}
+
+
+usuarios_gastos = defaultdict(float)
+
+for venta in ventas_data:
+    id_usuario = venta['id_usuario']
+    id_producto = venta['id_producto']
+    cantidad = venta['cantidad']
+    precio = precios_productos.get(id_producto, 0)
+    usuarios_gastos[id_usuario] += precio * cantidad
+
+
+usuario_max_gasto_id = max(usuarios_gastos, key=usuarios_gastos.get)
+gasto_maximo = usuarios_gastos[usuario_max_gasto_id]
+
+
+usuario_max_gasto_nombre = usuarios_nombres.get(usuario_max_gasto_id, "Nombre no encontrado")
+
+
+from collections import defaultdict
+
+
+ingreso_total = sum(
+    float(next(producto['precio'] for producto in productos_data if producto['id_producto'] == venta['id_producto']) or 0) * venta['cantidad']
+    for venta in
